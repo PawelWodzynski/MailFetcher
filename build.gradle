@@ -25,6 +25,8 @@ dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 
+	// Jackson dla JSON
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
 
 	// OpenAPI Swagger
 // https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui
