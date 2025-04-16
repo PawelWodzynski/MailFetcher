@@ -1,5 +1,7 @@
 package imap.mail.downloader;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +24,12 @@ public class EmailUploadController {
     private static final Logger logger = LoggerFactory.getLogger(EmailUploadController.class);
 
     private final EmailUploadService emailUploadService;
+    private final ObjectMapper objectMapper;
 
     @Autowired
-    public EmailUploadController(EmailUploadService emailUploadService) {
+    public EmailUploadController(EmailUploadService emailUploadService, ObjectMapper objectMapper) {
         this.emailUploadService = emailUploadService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -36,20 +40,59 @@ public class EmailUploadController {
             @RequestParam(value = "emailContent", required = false) String emailContent,
             @RequestParam(value = "subject", required = false) String subject,
             @RequestParam(value = "from", required = false) String from,
+            @RequestParam(value = "to", required = false) String to, // Dodane pole 'to'
             @RequestParam(value = "metadata", required = false) String metadataJson,
             @RequestParam(value = "attachment", required = false) MultipartFile[] attachments) {
 
         try {
             // Logowanie informacji o żądaniu
             logger.info("Rozpoczęto przetwarzanie żądania uploadEmail");
-            logger.debug("Parametry: subject={}, from={}, attachments={}",
+            logger.debug("Parametry: subject={}, from={}, to={}, attachments={}",
                     subject,
                     from,
+                    to,
                     attachments != null ? attachments.length : 0);
 
-            if (attachments != null && attachments.length > 0) {
-                for (int i = 0; i < attachments.length; i++) {
-                    MultipartFile file = attachments[i];
+            // Sprawdź, czy mamy załączniki w parametrach HTTP czy w metadanych JSON
+            MultipartFile[] effectiveAttachments = attachments;
+
+            if ((attachments == null || attachments.length == 0) && metadataJson != null && !metadataJson.isEmpty()) {
+                // Sprawdź czy metadane zawierają załączniki
+                logger.info("Brak załączników w parametrach HTTP, sprawdzanie w metadanych JSON");
+
+                try {
+                    // Sprawdź czy metadane zawierają załączniki
+                    JsonNode rootNode = objectMapper.readTree(metadataJson);
+                    JsonNode attachmentsNode = rootNode.get("attachments");
+
+                    if (attachmentsNode != null && attachmentsNode.isArray() && !attachmentsNode.isEmpty()) {
+                        logger.info("Znaleziono załączniki w metadanych JSON, konwertowanie do MultipartFile");
+
+                        // Konwertuj załączniki z JSON do MultipartFile[]
+                        effectiveAttachments = JsonMultipartConverter.convertJsonToMultipartFiles(metadataJson);
+
+                        if (effectiveAttachments != null) {
+                            logger.info("Skonwertowano {} załączników z JSON", effectiveAttachments.length);
+
+                            // Usuń załączniki z metadanych, aby uniknąć duplikacji
+                            ObjectMapper cleanMapper = new ObjectMapper();
+                            Map<String, Object> metadataMap = cleanMapper.readValue(metadataJson, Map.class);
+                            metadataMap.remove("attachments");
+                            metadataJson = cleanMapper.writeValueAsString(metadataMap);
+
+                            logger.debug("Zaktualizowano metadane JSON, usunięto załączniki");
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Błąd podczas analizy załączników JSON: {}", e.getMessage());
+                    logger.debug("Szczegóły błędu:", e);
+                }
+            }
+
+            // Logowanie informacji o załącznikach
+            if (effectiveAttachments != null && effectiveAttachments.length > 0) {
+                for (int i = 0; i < effectiveAttachments.length; i++) {
+                    MultipartFile file = effectiveAttachments[i];
                     if (file != null && !file.isEmpty()) {
                         logger.info("Załącznik {}: {} (rozmiar: {} bajtów, typ: {})",
                                 i,
@@ -64,7 +107,7 @@ public class EmailUploadController {
 
             // Delegowanie logiki do serwisu
             EmailUploadService.UploadResult result = emailUploadService.processEmailUpload(
-                    emailContent, subject, from, metadataJson, attachments);
+                    emailContent, subject, from, to, metadataJson, effectiveAttachments);
 
             // Zwracanie odpowiedzi na podstawie wyniku
             logger.info("Zakończono przetwarzanie żądania: success={}, emailId={}, attachmentsCount={}",

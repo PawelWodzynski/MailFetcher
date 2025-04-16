@@ -46,6 +46,7 @@ public class EmailUploadService {
             String emailContent,
             String subject,
             String from,
+            String to, // Dodane pole 'to'
             String metadataJson,
             MultipartFile[] attachments) throws DuplicateKeyException {
 
@@ -55,7 +56,7 @@ public class EmailUploadService {
         Map<String, Object> metadata = parseMetadataJson(metadataJson);
 
         // Ekstrakcja danych z emaila
-        EmailData emailData = extractEmailData(from, metadata);
+        EmailData emailData = extractEmailData(from, to, metadata);
 
         // Sprawdzenie czy mail już istnieje w bazie
         MailDocument mailDocument = null;
@@ -156,9 +157,10 @@ public class EmailUploadService {
     /**
      * Ekstrakcja danych z emaila i metadanych
      */
-    private EmailData extractEmailData(String from, Map<String, Object> metadata) {
+    private EmailData extractEmailData(String from, String to, Map<String, Object> metadata) {
         String senderEmail = extractEmailAddress(from);
-        String recipientEmail = extractRecipientFromMetadata(metadata);
+        String recipientEmail = to != null && !to.isEmpty() ?
+                extractEmailAddress(to) : extractRecipientFromMetadata(metadata);
         String messageId = extractMessageIdFromMetadata(metadata);
         Date sentDate = extractDateFromMetadata(metadata);
 
@@ -373,21 +375,21 @@ public class EmailUploadService {
     }
 
     /**
-     * Wyciągnięcie adresu email z pola "From"
+     * Wyciągnięcie adresu email z pola "From" lub "To"
      */
-    private String extractEmailAddress(String from) {
-        if (from == null || from.isEmpty()) {
+    private String extractEmailAddress(String emailField) {
+        if (emailField == null || emailField.isEmpty()) {
             return "";
         }
 
-        int startPos = from.indexOf('<');
-        int endPos = from.indexOf('>');
+        int startPos = emailField.indexOf('<');
+        int endPos = emailField.indexOf('>');
 
         if (startPos >= 0 && endPos > startPos) {
-            return from.substring(startPos + 1, endPos);
+            return emailField.substring(startPos + 1, endPos);
         }
 
-        return from;
+        return emailField;
     }
 
     /**
@@ -420,8 +422,10 @@ public class EmailUploadService {
             return null;
         }
 
-        if (metadata.containsKey("message-id")) {
-            String messageId = metadata.get("message-id").toString();
+        if (metadata.containsKey("message-id") || metadata.containsKey("messageId")) {
+            String messageId = metadata.containsKey("message-id") ?
+                    metadata.get("message-id").toString() :
+                    metadata.get("messageId").toString();
             return messageId.replaceAll("[<>]", "");
         }
 
@@ -442,7 +446,14 @@ public class EmailUploadService {
                 // Tutaj można dodać parser daty, na przykład:
                 // SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z");
                 // return sdf.parse(dateStr);
-                return null;
+
+                // Prosty parser daty z formatu ISO
+                try {
+                    return new Date(dateStr);
+                } catch (Exception e) {
+                    logger.warn("Nie można sparsować daty z metadanych: {}", e.getMessage());
+                    return null;
+                }
             }
         } catch (Exception e) {
             logger.warn("Nie można sparsować daty z metadanych: {}", e.getMessage());
