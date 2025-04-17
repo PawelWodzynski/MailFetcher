@@ -44,7 +44,7 @@ public class EmailUploadController {
             @RequestParam(value = "metadata", required = false) String metadataJson,
             @RequestParam(value = "attachment", required = false) MultipartFile[] attachments) {
 
-        try {
+        try { 
             // Logowanie informacji o żądaniu
             logger.info("Rozpoczęto przetwarzanie żądania uploadEmail");
             logger.debug("Parametry: subject={}, from={}, to={}, attachments={}",
