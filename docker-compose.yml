@@ -1,17 +1,16 @@
 version: '3.8'
-
 services:
   mongodb:
-    image: mongo:4.4
+    build:
+      context: ./database
+      dockerfile: Dockerfile.mongo
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
-      - ./database/init.js:/docker-entrypoint-initdb.d/init.js:ro
     environment:
       - MONGO_INITDB_DATABASE=mail-downloader
     restart: unless-stopped
-
   backend:
     build:
       context: ./backend
@@ -26,6 +25,5 @@ services:
       - ./logs:/app/logs
     depends_on:
       - mongodb
-
 volumes:
   mongo-data:

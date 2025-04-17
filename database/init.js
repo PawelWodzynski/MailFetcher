@@ -1,5 +1,5 @@
 // Przełącz na bazę mailreader (lub utwórz ją, jeśli nie istnieje)
-db = db.getSiblingDB('mailreader');
+db = db.getSiblingDB('mail-downloader');
 // Usuń istniejące kolekcje
 db.emails.drop(); db.files.drop();
 // Utwórz kolekcję dla emaili
