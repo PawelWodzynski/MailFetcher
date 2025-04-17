@@ -1,0 +1,9 @@
+FROM mongo:4.4
+# Kopiowanie skryptu inicjalizacyjnego do odpowiedniego katalogu
+COPY init.js /docker-entrypoint-initdb.d/
+# Upewnienie się, że skrypt ma odpowiednie uprawnienia
+RUN chmod 644 /docker-entrypoint-initdb.d/init.js
+# Dodajemy zdrowy entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
+# Domyślna komenda uruchamiająca MongoDB
+CMD ["mongod"]
