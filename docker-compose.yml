@@ -1,4 +1,3 @@
-```yaml
 version: '3.8'
 services:
   mongodb:
@@ -35,9 +34,6 @@ services:
 volumes:
   mongo-data:
 
-# Define the custom network
 networks:
   optiq_prod:
-    name: optiq_prod
-    driver: bridge
-```
+    external: true
